@@ -1,0 +1,24 @@
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+credentials.json
+.mcp.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp
