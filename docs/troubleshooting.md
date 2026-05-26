@@ -1,124 +1,124 @@
-# Troubleshooting
+# Rozwiązywanie problemów
 
-Common issues and how to diagnose them.
+Częste problemy i sposoby ich diagnozowania.
 
-## `Secret 'XYZ' not found in Keychain, env, or .env`
+## `BŁĄD: Nie znaleziono sekretu 'XYZ'`
 
-Order of likely causes (most common first):
+Kolejność prawdopodobnych przyczyn (od najczęstszych):
 
-1. **Wrong service name.** The toolkit defaults to service `my-secrets`. If you stored the key under a different service, set the env var:
+1. **Zła nazwa usługi.** Zestaw narzędzi domyślnie używa usługi `my-secrets`. Jeśli zapisałeś klucz pod inną usługą, ustaw zmienną środowiskową:
    ```bash
    KEYCHAIN_SERVICE=your-service-name python3 scripts/get_secret.py XYZ
    ```
 
-2. **Key is under `label` instead of `account`.** Older conventions used `-l KEY_NAME` (label) instead of `-a KEY_NAME` (account). The new toolkit uses `account=KEY_NAME`. To migrate:
+2. **Klucz znajduje się pod `label` zamiast `account`.** Starsze konwencje używały `-l KEY_NAME` (label) zamiast `-a KEY_NAME` (account). Nowy zestaw narzędzi używa `account=KEY_NAME`. Aby zmigrować:
    ```bash
-   # Read from old location (with label):
+   # Odczyt ze starej lokalizacji (z label):
    security find-generic-password -a robert -s my-secrets -l XYZ -w
 
-   # Write to new location (with account):
+   # Zapis do nowej lokalizacji (z account):
    security add-generic-password -U -a XYZ -s my-secrets -w '<value>'
    ```
 
-3. **You added the key but it doesn't show up.** Verify:
+3. **Dodałeś klucz, ale się nie pojawia.** Zweryfikuj:
    ```bash
    security find-generic-password -a XYZ -s my-secrets -w
    ```
-   If this returns empty but you can find it in Keychain Access app, you might have written it via `keyring.set_password()` (blob format). The Python fallback in `get_secret.py` will read it, but the `security` CLI alone won't.
+   Jeśli to polecenie zwraca pusty wynik, ale możesz znaleźć klucz w aplikacji Keychain Access, być może zapisałeś go przez `keyring.set_password()` (format blob). Fallback w Pythonie w `get_secret.py` go odczyta, ale samo CLI `security` nie.
 
-## `ERROR: XYZ has an unknown format`
+## `BŁĄD: XYZ ma nieznany format`
 
-The value in Keychain doesn't start with any of the expected prefixes for that provider. Causes:
+Wartość w Keychain nie zaczyna się od żadnego z oczekiwanych prefiksów dla tego dostawcy. Przyczyny:
 
-- You stored the **wrong provider's key** under that label. See [prefix-validation.md](prefix-validation.md) — the error message will suggest which label to use instead.
-- The key is **truncated**. Run:
+- Zapisałeś **klucz niewłaściwego dostawcy** pod tą etykietą. Zobacz [prefix-validation.md](prefix-validation.md) — komunikat o błędzie zasugeruje, jakiej etykiety użyć zamiast niej.
+- Klucz jest **ucięty**. Uruchom:
   ```bash
   python3 scripts/get_secret.py XYZ --no-validate | wc -c
   ```
-  Most AI API keys are 50-200 characters. If you see <20, it's truncated.
-- The key was **stored with quotes**. Some shells preserve quotes inside `-w '...'`. Re-store without:
+  Większość kluczy API AI ma 50-200 znaków. Jeśli widzisz <20, klucz jest ucięty.
+- Klucz został **zapisany z cudzysłowami**. Niektóre powłoki zachowują cudzysłowy wewnątrz `-w '...'`. Zapisz ponownie bez nich:
   ```bash
-  # Wrong (quotes literal):
+  # Źle (dosłowne cudzysłowy):
   security add-generic-password -U -a XYZ -s my-secrets -w "'sk-proj-XXX'"
 
-  # Correct (single quotes consumed by shell):
+  # Poprawnie (pojedyncze cudzysłowy konsumowane przez powłokę):
   security add-generic-password -U -a XYZ -s my-secrets -w 'sk-proj-XXX'
   ```
 
-## `401 Unauthorized` from the API even though the key is in Keychain
+## `401 Unauthorized` z API, mimo że klucz jest w Keychain
 
-Diagnostic order:
+Kolejność diagnostyki:
 
-1. **Is `--no-validate` needed?** If yes, you're using a custom-prefix key that the toolkit doesn't know about. Skip to step 3.
-2. **Did `get_secret.py` actually return what you expect?** Print the first 12 chars (safe — that's just the prefix):
+1. **Czy `--no-validate` jest potrzebne?** Jeśli tak, używasz klucza z niestandardowym prefiksem, którego zestaw narzędzi nie zna. Przejdź do kroku 3.
+2. **Czy `get_secret.py` faktycznie zwrócił to, czego oczekujesz?** Wypisz pierwsze 12 znaków (to bezpieczne — to tylko prefiks):
    ```bash
    python3 scripts/get_secret.py XYZ | head -c 12
    ```
-   Compare to the prefix you'd expect.
-3. **Is the key revoked?** Check the provider's dashboard. Keys are often invalidated when you rotate but you forget which one was new.
-4. **Is the key for the right account/workspace?** Some providers (OpenAI, Anthropic) have project-scoped keys. A project key for project A returns `401` for project B requests.
-5. **OAuth tokens vs API keys.** Tokens like `ya29.a0Aa...` (Google) or `gho_...` (GitHub) **expire**. They're not API keys. If you stored an OAuth token under an `_API_KEY` label, it'll work for a while then fail at the expiration time. Replace with a real API key (or persist the OAuth refresh flow).
+   Porównaj z prefiksem, którego się spodziewasz.
+3. **Czy klucz został unieważniony?** Sprawdź dashboard dostawcy. Klucze są często unieważniane podczas rotacji, gdy zapomnisz, który z nich był nowy.
+4. **Czy klucz jest dla właściwego konta/workspace'u?** Niektórzy dostawcy (OpenAI, Anthropic) mają klucze o zasięgu projektu. Klucz projektu dla projektu A zwróci `401` dla żądań z projektu B.
+5. **Tokeny OAuth a klucze API.** Tokeny takie jak `ya29.a0Aa...` (Google) lub `gho_...` (GitHub) **wygasają**. To nie są klucze API. Jeśli zapisałeś token OAuth pod etykietą `_API_KEY`, będzie działał przez jakiś czas, a potem przestanie w momencie wygaśnięcia. Zastąp go prawdziwym kluczem API (lub zaimplementuj trwały mechanizm odświeżania OAuth).
 
-## Keychain prompts for password every time
+## Keychain pyta o hasło za każdym razem
 
-Keychain Access by default unlocks on login. If it's prompting per-command:
+Aplikacja Keychain Access domyślnie odblokowuje się przy logowaniu. Jeśli pyta o hasło przy każdym poleceniu:
 
-1. Open **Keychain Access** app
-2. Right-click the entry → **Get Info** → **Access Control** tab
-3. Add `/usr/bin/security` and `/usr/bin/python3` to **Always allow access by these applications**
+1. Otwórz aplikację **Keychain Access**
+2. Kliknij wpis prawym przyciskiem myszy → **Get Info** → zakładka **Access Control**
+3. Dodaj `/usr/bin/security` oraz `/usr/bin/python3` do **Always allow access by these applications**
 
-For maximum convenience: set "Allow all applications" — but only for development machines, not shared/work machines.
+Dla maksymalnej wygody: ustaw "Allow all applications" — ale tylko na maszynach deweloperskich, nie na współdzielonych/służbowych.
 
-## `pip install keyring` fails with `externally-managed-environment`
+## `pip install keyring` kończy się błędem `externally-managed-environment`
 
-macOS Python 3.12+ enforces PEP 668. Options:
+Python 3.12+ w systemie macOS wymusza PEP 668. Opcje:
 
 ```bash
-# Option 1 — user install (recommended for personal tools):
+# Opcja 1 — instalacja użytkownika (zalecane dla narzędzi osobistych):
 pip3 install --user keyring
 
-# Option 2 — virtual env (recommended for projects):
+# Opcja 2 — środowisko wirtualne (zalecane dla projektów):
 python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
 
-# Option 3 — Homebrew Python (drops PEP 668 enforcement):
+# Opcja 3 — Python z Homebrew (znosi wymuszanie PEP 668):
 brew install python && pip3 install keyring
 
-# Option 4 — only if you accept the risk:
+# Opcja 4 — tylko jeśli akceptujesz ryzyko:
 pip3 install --break-system-packages keyring
 ```
 
-Most users want option 1 or 2.
+Większość użytkowników wybierze opcję 1 lub 2.
 
-## Wrapper script fails: "command not found" or "permission denied"
+## Skrypt wrapper zawodzi: "command not found" lub "permission denied"
 
 ```bash
 chmod 755 scripts/mcp-*-wrapper.sh
 ```
 
-Also check the **first line** of the wrapper (`#!/bin/bash`) — if it has Windows line endings (`\r\n`), bash can't parse it. Fix:
+Sprawdź również **pierwszą linię** wrappera (`#!/bin/bash`) — jeśli ma windowsowe zakończenia linii (`\r\n`), bash nie będzie w stanie jej sparsować. Naprawa:
 
 ```bash
 sed -i '' 's/\r$//' scripts/mcp-*-wrapper.sh
 ```
 
-## I accidentally pasted a key into an AI chat / committed it
+## Przypadkowo wkleiłem klucz do czatu AI / zacommitowałem go
 
-See **[security-first.md](security-first.md)** — "If a key leaks anyway".
+Zobacz **[security-first.md](security-first.md)** — "Jeśli klucz i tak wycieknie".
 
-TL;DR: rotate immediately in the provider's dashboard. Don't try to clean git history — caches and forks keep the old commits reachable. The key is compromised the moment it leaves your terminal; the only fix is rotation.
+TL;DR: natychmiast zrotuj klucz w dashboardzie dostawcy. Nie próbuj czyścić historii git — cache i forki sprawiają, że stare commity wciąż są dostępne. Klucz jest skompromitowany w momencie, gdy opuszcza Twój terminal; jedynym rozwiązaniem jest rotacja.
 
-## Adding diagnostic logging
+## Dodawanie logowania diagnostycznego
 
-If `get_secret.py` mysteriously returns wrong values or nothing, add temporary debug logging:
+Jeśli `get_secret.py` w tajemniczy sposób zwraca błędne wartości lub nie zwraca nic, dodaj tymczasowe logowanie debugowania:
 
 ```python
-# Top of get_secret.py:
+# Na górze get_secret.py:
 import sys
 DEBUG = True
 
-# Inside get_from_keychain:
+# Wewnątrz get_from_keychain:
 if DEBUG:
     print(f"[debug] trying security CLI: account={key_name} service={service}", file=sys.stderr)
 ```
 
-This logs to stderr so it doesn't pollute the stdout value (the key itself). Remove when done.
+Loguje to do stderr, więc nie zanieczyszcza wartości stdout (samego klucza). Usuń po zakończeniu.

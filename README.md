@@ -1,32 +1,32 @@
 # keychain-secrets-toolkit
 
-macOS Keychain-based secrets management for AI API keys + Claude Code MCP servers.
+Bezpieczne przechowywanie kluczy API do AI w macOS Keychain — plus wrappery do serwerów MCP w Claude Code.
 
-A small toolkit (two Python scripts, a shell wrapper template, a few docs) that keeps your AI API keys out of `.env` files, shell history, screenshots, and AI chat transcripts. Keys live in the macOS Keychain. Your code retrieves them via a single command that never leaks the value.
+Mały toolkit (dwa skrypty Pythona, szablon wrappera shellowego, kilka dokumentów) który trzyma Twoje klucze API z dala od plików `.env`, historii shella, screenshotów i transkryptów AI. Klucze żyją w macOS Keychain. Twój kod pobiera je pojedynczą komendą która nigdy nie ujawnia wartości.
 
-> **macOS only.** This toolkit relies on the native `security` CLI and Keychain. Windows/Linux equivalents (Credential Manager, GNOME Keyring) work in theory through the Python `keyring` library, but the scripts haven't been adapted or tested there.
+> **Tylko macOS.** Toolkit polega na natywnym CLI `security` i Keychainie. Odpowiedniki Windows/Linux (Credential Manager, GNOME Keyring) teoretycznie działają przez bibliotekę Pythona `keyring`, ale skrypty nie zostały do nich zaadaptowane ani przetestowane.
 
-## Why
+## Po co to
 
-The default way developers store AI API keys — putting them in `.env`, then committing the file by mistake, or copying the value into a ChatGPT prompt for "debugging" — leaks more keys per week than every real hack combined. This toolkit:
+Domyślny sposób w jaki developerzy przechowują klucze API do AI — wrzucają je do `.env`, potem przypadkiem commitują plik, albo wklejają wartość do ChatGPT "żeby zdebugować" — wycieka więcej kluczy tygodniowo niż wszystkie realne włamania razem wzięte. Ten toolkit:
 
-- Stores keys in macOS Keychain (OS-level vault, unlocked by your login password / Touch ID)
-- Replaces `.env` values with `STORED_IN_KEYRING` placeholders, so the file is safe to commit
-- Provides a unified lookup script — your code never sees the raw key in source or shell history
-- Catches **cross-provider mistakes** (a key looks like the wrong provider's, it fails fast with a fix instruction instead of a generic 401)
-- Includes an MCP wrapper pattern for Claude Code / MCP server users who can't put plaintext keys in `.mcp.json`
+- Trzyma klucze w macOS Keychain (vault na poziomie OS, odblokowywany Twoim hasłem logowania / Touch ID)
+- Zastępuje wartości w `.env` placeholderami `STORED_IN_KEYRING`, więc plik jest bezpieczny do commitowania
+- Daje jednolity skrypt do lookup'u — Twój kod nigdy nie widzi surowego klucza w źródle ani historii shella
+- Łapie **pomyłki cross-provider** (jeśli klucz wygląda jak nie tego providera, fail-fast z instrukcją naprawy zamiast generycznego 401)
+- Zawiera wzorzec wrappera dla MCP dla użytkowników Claude Code / serwerów MCP którzy nie mogą trzymać plaintext kluczy w `.mcp.json`
 
-## The one rule
+## Jedna zasada
 
-> **Never paste an API key into an AI chat (ChatGPT, Claude Code, Cursor, Gemini, anything else).**
+> **Nigdy nie wklejaj klucza API do AI chatu (ChatGPT, Claude Code, Cursor, Gemini, czegokolwiek innego).**
 
-Pasting a key into an AI tool puts it in the model's session context, the provider's pipeline logs, and your conversation transcript. The damage is permanent — the only fix is rotation.
+Wklejenie klucza do narzędzia AI ląduje w kontekście sesji modelu, w logach pipeline'u providera i w transkrypcie Twojej konwersacji. Szkoda jest permanentna — jedyna naprawa to rotacja klucza.
 
-Read **[docs/security-first.md](docs/security-first.md)** before anything else. It's short and load-bearing.
+Przeczytaj **[docs/security-first.md](docs/security-first.md)** zanim cokolwiek zrobisz. Jest krótki i kluczowy.
 
-## Setup (5 minutes)
+## Setup (5 minut)
 
-### 1. Clone
+### 1. Klonuj
 
 ```bash
 git clone https://github.com/Szewowsky/keychain-secrets-toolkit.git
@@ -34,54 +34,54 @@ cd keychain-secrets-toolkit
 pip3 install --user -r requirements.txt
 ```
 
-(Or use a virtual env — see `docs/troubleshooting.md` if `pip3 install` fails.)
+(Albo użyj virtual env — patrz `docs/troubleshooting.md` jeśli `pip3 install` failuje.)
 
-### 2. Add your keys (pick one method)
+### 2. Dodaj swoje klucze (wybierz jedną metodę)
 
-**Method A — Interactive (recommended). The key never enters shell history or any file:**
+**Metoda A — Interaktywna (zalecana). Klucz nigdy nie ląduje w historii shella ani w żadnym pliku:**
 
 ```bash
 python3 scripts/setup_keyring.py --interactive
 ```
 
-Prompts for each key listed in `.env.example`. Press Enter to skip ones you don't have.
+Pyta o każdy klucz wymieniony w `.env.example`. Enter pomija te których nie masz.
 
-**Method B — Native macOS CLI, one at a time:**
+**Metoda B — Natywne CLI macOS, jeden po drugim:**
 
 ```bash
 security add-generic-password -U -a OPENAI_API_KEY -s my-secrets -w 'sk-proj-XXX'
 security add-generic-password -U -a ANTHROPIC_API_KEY -s my-secrets -w 'sk-ant-XXX'
 ```
 
-The whole command (including the key) lands in `~/.zsh_history`. Either prefix the command with a leading space (if your shell has `HIST_IGNORE_SPACE`) or run `history -d $(history | tail -1 | awk '{print $1}')` after to remove the last entry.
+Cała komenda (włącznie z kluczem) ląduje w `~/.zsh_history`. Albo poprzedź komendę spacją (jeśli masz `HIST_IGNORE_SPACE` w shellu), albo uruchom `history -d $(history | tail -1 | awk '{print $1}')` żeby usunąć ostatni wpis.
 
-**Method C — Migrate from existing `.env`:**
+**Metoda C — Migracja z istniejącego `.env`:**
 
 ```bash
-# 1. Copy .env.example, fill in real values
+# 1. Skopiuj .env.example, wpisz prawdziwe wartości
 cp .env.example .env
-# edit .env in your favorite editor
+# edytuj .env w ulubionym edytorze
 
-# 2. Migrate (asks for confirmation):
+# 2. Migruj (pyta o potwierdzenie):
 python3 scripts/setup_keyring.py
 
-# .env is now overwritten with STORED_IN_KEYRING placeholders.
+# .env jest teraz nadpisany placeholderami STORED_IN_KEYRING.
 ```
 
-### 3. Use it
+### 3. Używaj
 
-In shell scripts:
+W skryptach shellowych:
 
 ```bash
 curl https://api.openai.com/v1/chat/completions \
   -H "Authorization: Bearer $(python3 scripts/get_secret.py OPENAI_API_KEY)" \
   -H "Content-Type: application/json" \
-  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]}'
+  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"cześć"}]}'
 ```
 
-The shell expands `$(...)` before `curl` runs — the key flows from `python3` straight into the HTTP header, never appearing on stdout.
+Shell rozwija `$(...)` zanim uruchomi `curl` — klucz przepływa z `python3` prosto do headera HTTP, nigdy nie pojawiając się na stdout.
 
-In Python:
+W Pythonie:
 
 ```python
 import subprocess
@@ -95,111 +95,111 @@ def get_secret(key_name):
 openai_key = get_secret("OPENAI_API_KEY")
 ```
 
-See `examples/usage-curl.sh` and `examples/usage-python.py` for more.
+Więcej w `examples/usage-curl.sh` i `examples/usage-python.py`.
 
-## Cross-provider validation (the bug nobody catches the first time)
+## Walidacja cross-provider (bug którego nikt nie łapie za pierwszym razem)
 
-Imagine you accidentally store your OpenRouter key under the `OPENAI_API_KEY` label. You send it to OpenAI. OpenAI returns `401 Unauthorized`. You spend an hour debugging your code.
+Wyobraź sobie że przypadkiem trzymasz klucz OpenRouter pod etykietą `OPENAI_API_KEY`. Wysyłasz go do OpenAI. OpenAI zwraca `401 Unauthorized`. Spędzasz godzinę debugując swój kod.
 
-This toolkit catches it before the request leaves:
+Ten toolkit łapie to zanim request opuści maszynę:
 
 ```bash
 python3 scripts/get_secret.py OPENAI_API_KEY
 # →
-# ERROR: OPENAI_API_KEY in Keychain looks like a OpenRouter key (starts with 'sk-or-').
-# Most likely OPENROUTER_API_KEY was stored under the OPENAI_API_KEY label by mistake.
-# Fix:
-#   1) Get the real OPENAI_API_KEY: sk-proj-XXXX (from https://platform.openai.com/api-keys)
-#   2) Overwrite the wrong entry: ...
+# BŁĄD: OPENAI_API_KEY w Keychain wygląda jak klucz OpenRouter (zaczyna się od 'sk-or-').
+# Najprawdopodobniej OPENROUTER_API_KEY został omyłkowo zapisany pod etykietą OPENAI_API_KEY.
+# Naprawa:
+#   1) Pobierz prawdziwy OPENAI_API_KEY: sk-proj-XXXX (z https://platform.openai.com/api-keys)
+#   2) Nadpisz błędny wpis: ...
 ```
 
-Works for OpenAI, Anthropic, OpenRouter, Google Gemini out of the box. Add more in `scripts/get_secret.py` → `PROVIDER_FORMAT`. See [docs/prefix-validation.md](docs/prefix-validation.md).
+Działa out of the box dla OpenAI, Anthropic, OpenRouter, Google Gemini. Dodaj więcej w `scripts/get_secret.py` → `PROVIDER_FORMAT`. Patrz [docs/prefix-validation.md](docs/prefix-validation.md).
 
-Disable for tests: `python3 scripts/get_secret.py XYZ --no-validate`.
+Wyłączenie na potrzeby testów: `python3 scripts/get_secret.py XYZ --no-validate`.
 
-## MCP wrapper pattern (for Claude Code / MCP users)
+## Wzorzec wrappera MCP (dla użytkowników Claude Code / MCP)
 
-If you use Claude Code with MCP servers, you've hit this — `.mcp.json` either has plaintext keys in `env:` (bad — commits to git) or no keys at all (and the MCP server fails).
+Jeśli używasz Claude Code z serwerami MCP, na pewno trafiłeś na to — `.mcp.json` ma albo plaintext klucze w `env:` (źle — commituje się do git), albo nie ma kluczy w ogóle (i serwer MCP failuje).
 
-Use the wrapper script pattern instead. `scripts/mcp-wrapper-template.sh` is a generic template; copy and edit:
+Użyj zamiast tego wzorca wrappera shellowego. `scripts/mcp-wrapper-template.sh` to generyczny szablon; skopiuj i edytuj:
 
 ```bash
-cp scripts/mcp-wrapper-template.sh scripts/mcp-myserver-wrapper.sh
-# edit KEY_NAME and MCP_PACKAGE
-chmod +x scripts/mcp-myserver-wrapper.sh
+cp scripts/mcp-wrapper-template.sh scripts/mcp-mojserwer-wrapper.sh
+# edytuj KEY_NAME i MCP_PACKAGE
+chmod +x scripts/mcp-mojserwer-wrapper.sh
 ```
 
-Then in `.mcp.json`:
+Następnie w `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
-    "myserver": {
-      "command": "/absolute/path/to/scripts/mcp-myserver-wrapper.sh"
+    "mojserwer": {
+      "command": "/absolutna/sciezka/do/scripts/mcp-mojserwer-wrapper.sh"
     }
   }
 }
 ```
 
-The wrapper reads the key from Keychain at startup, exports it for the MCP process, and `exec`'s into it. `.mcp.json` is safe to commit — it only has a path.
+Wrapper pobiera klucz z Keychain przy starcie, eksportuje go dla procesu MCP i `exec`'uje serwer. `.mcp.json` jest bezpieczny do commitowania — zawiera tylko ścieżkę.
 
-Real example: `examples/mcp-n8n-wrapper.sh` (n8n-mcp wrapper). Limitations and SSE-type MCP servers covered in [docs/mcp-pattern.md](docs/mcp-pattern.md).
+Realny przykład: `examples/mcp-n8n-wrapper.sh` (wrapper dla n8n-mcp). Limitacje i serwery typu SSE pokryte w [docs/mcp-pattern.md](docs/mcp-pattern.md).
 
-## Per-project services (optional)
+## Per-project services (opcjonalne)
 
-By default, keys live under Keychain service name `my-secrets`. Override per-project:
+Domyślnie klucze żyją pod nazwą serwisu Keychain `my-secrets`. Możesz nadpisać per-projekt:
 
 ```bash
-# One-off:
+# Jednorazowo:
 KEYCHAIN_SERVICE=acme-prod python3 scripts/get_secret.py OPENAI_API_KEY
 
-# Persistent (.zshrc or per-project .envrc with direnv):
+# Persystentnie (.zshrc albo per-project .envrc z direnv):
 export KEYCHAIN_SERVICE="$(basename $(pwd))"
 ```
 
-Different services keep keys for different projects isolated. Same Keychain, different namespaces.
+Różne serwisy trzymają klucze różnych projektów odseparowane. Ten sam Keychain, różne namespacy.
 
-## Layout
+## Struktura
 
 ```
 keychain-secrets-toolkit/
-├── README.md                          # you are here
+├── README.md                          # tu jesteś
 ├── LICENSE                            # MIT
-├── .env.example                       # template (4 generic AI providers)
+├── .env.example                       # szablon (4 generyczne providery AI)
 ├── requirements.txt                   # keyring>=24.0
 ├── scripts/
-│   ├── get_secret.py                  # main lookup (Keychain → env → .env) + per-provider validation
-│   ├── setup_keyring.py               # bulk migration from .env, or --interactive mode
-│   └── mcp-wrapper-template.sh        # generic MCP wrapper (copy, edit KEY_NAME + MCP_PACKAGE)
+│   ├── get_secret.py                  # główny lookup (Keychain → env → .env) + walidacja per-provider
+│   ├── setup_keyring.py               # bulk migracja z .env, albo tryb --interactive
+│   └── mcp-wrapper-template.sh        # generyczny wrapper MCP (skopiuj, edytuj KEY_NAME + MCP_PACKAGE)
 ├── examples/
-│   ├── usage-curl.sh                  # curl with shell substitution
-│   ├── usage-python.py                # subprocess + Python SDK pattern
-│   └── mcp-n8n-wrapper.sh             # real wrapper example (sanitized)
+│   ├── usage-curl.sh                  # curl z shell substitution
+│   ├── usage-python.py                # subprocess + wzorzec SDK Pythona
+│   └── mcp-n8n-wrapper.sh             # realny przykład wrappera (sanityzowany)
 └── docs/
-    ├── security-first.md              # READ FIRST — where keys must never go
-    ├── lookup-chain.md                # how get_secret.py finds your keys
-    ├── prefix-validation.md           # cross-provider mismatch protection
-    ├── mcp-pattern.md                 # MCP wrappers + SSE limitations
-    └── troubleshooting.md             # common errors and diagnostics
+    ├── security-first.md              # PRZECZYTAJ PIERWSZE — gdzie klucze nigdy nie mogą trafić
+    ├── lookup-chain.md                # jak get_secret.py znajduje Twoje klucze
+    ├── prefix-validation.md           # ochrona przed cross-provider mismatch
+    ├── mcp-pattern.md                 # wrappery MCP + limitacje SSE
+    └── troubleshooting.md             # najczęstsze błędy i diagnostyka
 ```
 
-## What's not covered
+## Czego tu NIE ma
 
-- **Non-macOS platforms.** Python `keyring` works on Windows/Linux, but the `security` CLI calls don't. The scripts would need refactoring to use `keyring` exclusively. PRs welcome.
-- **SSO / OAuth flows.** OAuth tokens expire — they're not API keys. Storing them under `_API_KEY` labels works for a while then fails. Don't.
-- **Server-side / headless setups.** macOS Keychain requires an unlocked login session. For headless servers, use the cloud provider's secret manager (AWS Secrets Manager, GCP Secret Manager, Vault, etc.).
-- **Team key sharing.** This toolkit is single-user. If multiple people need the same key, use a password manager with sharing (1Password, Bitwarden) or a team secrets service.
+- **Platformy inne niż macOS.** Biblioteka Pythona `keyring` działa na Windows/Linux, ale wywołania CLI `security` już nie. Skrypty musiałyby być zrefaktorowane żeby używać `keyring` ekskluzywnie. PR-y mile widziane.
+- **Flow SSO / OAuth.** Tokeny OAuth wygasają — to nie są klucze API. Przechowywanie ich pod etykietami `_API_KEY` działa przez chwilę, potem failuje. Nie rób tego.
+- **Setupy server-side / headless.** macOS Keychain wymaga odblokowanej sesji logowania. Dla headless serwerów użyj cloud secret managera (AWS Secrets Manager, GCP Secret Manager, Vault, etc.).
+- **Sharing kluczy w zespole.** Ten toolkit jest single-user. Jeśli wiele osób potrzebuje tego samego klucza, użyj password managera z share'owaniem (1Password, Bitwarden) albo team secrets service.
 
-## License
+## Licencja
 
-MIT. See [LICENSE](LICENSE).
+MIT. Patrz [LICENSE](LICENSE).
 
-## Contributing
+## Kontrybucje
 
-Issues and PRs welcome — especially:
+Issues i PR-y mile widziane — zwłaszcza:
 
-- Windows / Linux platform support (refactor to use `keyring` library exclusively)
-- More provider prefixes in `PROVIDER_FORMAT`
-- Real MCP wrapper examples for other servers
+- Wsparcie Windows / Linux (refactor żeby używać biblioteki `keyring` ekskluzywnie)
+- Więcej prefixów providerów w `PROVIDER_FORMAT`
+- Realne przykłady wrapperów MCP dla innych serwerów
 
-Don't include real API keys in PRs, screenshots, or examples. Use `sk-proj-EXAMPLE-XXX` style placeholders.
+Nie wrzucaj prawdziwych kluczy API do PR-ów, screenshotów ani przykładów. Używaj placeholderów typu `sk-proj-EXAMPLE-XXX`.

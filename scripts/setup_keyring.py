@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 """
-Migrate secrets to macOS Keychain.
+Migracja sekretów do pęku kluczy macOS (Keychain).
 
-Two modes:
+Dwa tryby:
 
-1. Bulk migration from .env (when you already have keys somewhere):
+1. Masowa migracja z .env (gdy masz już gdzieś klucze):
        python3 scripts/setup_keyring.py
 
-   Reads .env, stores each value in Keychain, overwrites .env values with
-   STORED_IN_KEYRING placeholders. Asks for confirmation before writing.
+   Odczytuje .env, zapisuje każdą wartość w Keychain, nadpisuje wartości w .env
+   placeholderami STORED_IN_KEYRING. Prosi o potwierdzenie przed zapisem.
 
-2. Interactive mode (recommended — keys never land in shell history or files):
+2. Tryb interaktywny (zalecany — klucze nigdy nie trafiają do historii powłoki ani plików):
        python3 scripts/setup_keyring.py --interactive
 
-   Prompts for each key listed in .env.example, reads value via input(),
-   writes directly to Keychain. The .env file is NOT touched (you can keep
-   it as a list of placeholders).
+   Pyta o każdy klucz z .env.example, odczytuje wartość przez input(),
+   zapisuje bezpośrednio do Keychain. Plik .env NIE jest modyfikowany (możesz go
+   zachować jako listę placeholderów).
 
-Service name:
-    Default service is "my-secrets". Override with KEYCHAIN_SERVICE env var:
+Nazwa usługi:
+    Domyślna usługa to "my-secrets". Nadpisz zmienną środowiskową KEYCHAIN_SERVICE:
         KEYCHAIN_SERVICE=my-project python3 scripts/setup_keyring.py
 """
 import os
@@ -28,7 +28,7 @@ import getpass
 try:
     import keyring
 except ImportError:
-    print("ERROR: install dependencies first → pip3 install -r requirements.txt", file=sys.stderr)
+    print("BŁĄD: najpierw zainstaluj zależności → pip3 install -r requirements.txt", file=sys.stderr)
     sys.exit(1)
 
 DEFAULT_SERVICE = "my-secrets"
@@ -40,8 +40,8 @@ def get_service() -> str:
 
 
 def parse_env_file(path: str, only_keys: bool = False) -> tuple[dict[str, str], list[str]]:
-    """Return (secrets_with_values, raw_lines). If only_keys=True, return empty values dict
-    but include keys as list (no parsing of values)."""
+    """Zwraca (secrets_with_values, raw_lines). Jeśli only_keys=True, zwraca pusty słownik wartości,
+    ale dołącza klucze jako listę (bez parsowania wartości)."""
     secrets = {}
     lines = []
     if not os.path.exists(path):
@@ -66,24 +66,24 @@ def parse_env_file(path: str, only_keys: bool = False) -> tuple[dict[str, str], 
 
 
 def bulk_migrate(env_path: str) -> None:
-    """Read .env, store values in Keychain, replace .env with placeholders."""
+    """Odczytuje .env, zapisuje wartości w Keychain, zastępuje .env placeholderami."""
     secrets, lines = parse_env_file(env_path)
     service = get_service()
 
     if not secrets:
-        print(f"No secrets to migrate from {env_path} (all already STORED_IN_KEYRING or .env empty).")
-        print(f"Try interactive mode instead: python3 scripts/setup_keyring.py --interactive")
+        print(f"Brak sekretów do migracji z {env_path} (wszystkie to już STORED_IN_KEYRING lub .env jest pusty).")
+        print(f"Zamiast tego spróbuj trybu interaktywnego: python3 scripts/setup_keyring.py --interactive")
         sys.exit(0)
 
-    print(f"Found {len(secrets)} secret(s) in {env_path}:\n")
+    print(f"Znaleziono {len(secrets)} sekret(ów) w {env_path}:\n")
     for key, value in secrets.items():
         preview = value[:4] + "..." if len(value) > 4 else value
         print(f"  {key} = {preview}")
 
-    print(f"\nTarget: macOS Keychain (service: '{service}')")
-    confirm = input("\nProceed? [y/N]: ").strip().lower()
+    print(f"\nCel: pęk kluczy macOS (usługa: '{service}')")
+    confirm = input("\nKontynuować? [y/N]: ").strip().lower()
     if confirm != "y":
-        print("Aborted.")
+        print("Przerwano.")
         sys.exit(0)
 
     print()
@@ -94,23 +94,23 @@ def bulk_migrate(env_path: str) -> None:
             preview = stored[:4] + "..."
             print(f"  OK   {key} -> Keychain ({preview})")
         else:
-            print(f"  FAIL {key} -> verification failed!")
+            print(f"  BŁĄD {key} -> weryfikacja nie powiodła się!")
             sys.exit(1)
 
     with open(env_path, "w") as f:
         f.write("\n".join(lines) + "\n")
 
-    print(f"\n.env updated -> all values replaced with '{PLACEHOLDER}'")
-    print(f"Verify: python3 scripts/get_secret.py <KEY_NAME>")
+    print(f"\nZaktualizowano .env -> wszystkie wartości zastąpiono '{PLACEHOLDER}'")
+    print(f"Weryfikacja: python3 scripts/get_secret.py <KEY_NAME>")
 
 
 def interactive_setup(example_path: str) -> None:
-    """Prompt for each key in .env.example, read values via input(), store in Keychain.
-    Keys never land in shell history or files — they go straight from terminal to Keychain."""
+    """Pyta o każdy klucz z .env.example, odczytuje wartości przez input(), zapisuje w Keychain.
+    Klucze nigdy nie trafiają do historii powłoki ani plików — idą prosto z terminala do Keychain."""
     _, raw_lines = parse_env_file(example_path)
     service = get_service()
 
-    # Extract just the key names from .env.example
+    # Wyodrębnij tylko nazwy kluczy z .env.example
     keys = []
     for line in raw_lines:
         line = line.strip()
@@ -120,18 +120,18 @@ def interactive_setup(example_path: str) -> None:
             keys.append(line.split("=", 1)[0].strip())
 
     if not keys:
-        print(f"No keys found in {example_path}. Add lines like 'OPENAI_API_KEY=STORED_IN_KEYRING' first.")
+        print(f"Nie znaleziono kluczy w {example_path}. Najpierw dodaj linie typu 'OPENAI_API_KEY=STORED_IN_KEYRING'.")
         sys.exit(1)
 
-    print(f"Interactive setup — service: '{service}'")
-    print(f"Found {len(keys)} key(s) in {example_path}.")
-    print("Press Enter to skip a key. Values are not echoed and not stored in shell history.\n")
+    print(f"Konfiguracja interaktywna — usługa: '{service}'")
+    print(f"Znaleziono {len(keys)} klucz(y) w {example_path}.")
+    print("Naciśnij Enter, aby pominąć klucz. Wartości nie są wyświetlane ani zapisywane w historii powłoki.\n")
 
     saved = 0
     for key in keys:
         value = getpass.getpass(f"  {key}: ")
         if not value:
-            print(f"  -- skipped {key}")
+            print(f"  -- pominięto {key}")
             continue
         keyring.set_password(service, key, value)
         stored = keyring.get_password(service, key)
@@ -139,11 +139,11 @@ def interactive_setup(example_path: str) -> None:
             print(f"  OK {key} -> Keychain ({value[:4]}...)")
             saved += 1
         else:
-            print(f"  FAIL {key} -> verification failed!")
+            print(f"  BŁĄD {key} -> weryfikacja nie powiodła się!")
             sys.exit(1)
 
-    print(f"\nDone. {saved}/{len(keys)} key(s) stored.")
-    print(f"Verify: python3 scripts/get_secret.py <KEY_NAME>")
+    print(f"\nGotowe. Zapisano {saved}/{len(keys)} klucz(y).")
+    print(f"Weryfikacja: python3 scripts/get_secret.py <KEY_NAME>")
 
 
 def main():
@@ -155,12 +155,12 @@ def main():
 
     if interactive:
         if not os.path.exists(example_path):
-            print(f"ERROR: {example_path} not found. Create it first (see README).", file=sys.stderr)
+            print(f"BŁĄD: nie znaleziono {example_path}. Najpierw go utwórz (zobacz README).", file=sys.stderr)
             sys.exit(1)
         interactive_setup(example_path)
     else:
         if not os.path.exists(env_path):
-            print(f"ERROR: {env_path} not found.\nEither:\n  - Copy .env.example to .env and add real values, then re-run\n  - Or use interactive mode: python3 scripts/setup_keyring.py --interactive", file=sys.stderr)
+            print(f"BŁĄD: nie znaleziono {env_path}.\nMożesz:\n  - Skopiować .env.example do .env i dodać prawdziwe wartości, a następnie uruchomić ponownie\n  - Albo użyć trybu interaktywnego: python3 scripts/setup_keyring.py --interactive", file=sys.stderr)
             sys.exit(1)
         bulk_migrate(env_path)
 

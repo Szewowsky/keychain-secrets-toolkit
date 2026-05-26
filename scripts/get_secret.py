@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 """
-Fetch a secret from macOS Keychain.
+Pobierz sekret z pęku kluczy macOS (Keychain).
 
-Fallback chain: Keychain -> env var -> .env file
+Łańcuch awaryjny: Keychain -> zmienna środowiskowa -> plik .env
 
-Usage:
+Użycie:
     python3 scripts/get_secret.py KEY_NAME
 
-Shell substitution (recommended):
+Podstawienie w powłoce (zalecane):
     curl -H "Authorization: Bearer $(python3 scripts/get_secret.py OPENAI_API_KEY)" ...
 
-Service name:
-    Default service is "my-secrets". Override with KEYCHAIN_SERVICE env var:
+Nazwa usługi:
+    Domyślna usługa to "my-secrets". Nadpisz za pomocą zmiennej środowiskowej KEYCHAIN_SERVICE:
         KEYCHAIN_SERVICE=my-project python3 scripts/get_secret.py OPENAI_API_KEY
 
-Per-provider prefix validation:
-    For known AI providers (OpenAI, Anthropic, OpenRouter, Gemini), the script
-    validates that the value matches the expected prefix. If you accidentally
-    stored a wrong-provider key under the wrong label (e.g. an OpenRouter key
-    under OPENAI_API_KEY), the script fails fast with a clear message instead
-    of letting the API return a generic 401.
+Walidacja prefiksów dla poszczególnych dostawców:
+    Dla znanych dostawców AI (OpenAI, Anthropic, OpenRouter, Gemini), skrypt
+    sprawdza, czy wartość pasuje do oczekiwanego prefiksu. Jeśli przypadkowo
+    zapisano klucz niewłaściwego dostawcy pod złą etykietą (np. klucz OpenRouter
+    jako OPENAI_API_KEY), skrypt szybko kończy działanie z jasnym komunikatem,
+    zamiast pozwalać API na zwrócenie ogólnego błędu 401.
 
-    Disable validation: --no-validate (useful for tests or migration).
+    Wyłączenie walidacji: --no-validate (przydatne w testach lub podczas migracji).
 
-See docs/prefix-validation.md for details.
+Zobacz docs/prefix-validation.md, aby uzyskać szczegóły.
 """
-from __future__ import annotations  # PEP 604 (`str | None`) on Python 3.9 needs lazy eval
+from __future__ import annotations  # PEP 604 (`str | None`) w Pythonie 3.9 wymaga leniwej ewaluacji
 
 import sys
 import os
@@ -37,8 +37,8 @@ def get_service() -> str:
     return os.environ.get("KEYCHAIN_SERVICE", DEFAULT_SERVICE)
 
 
-# Per-provider key format spec.
-# wrong_provider_hints: if value starts with one of these prefixes, suggest the correct label.
+# Specyfikacja formatu klucza dla poszczególnych dostawców.
+# wrong_provider_hints: jeśli wartość zaczyna się od jednego z tych prefiksów, zasugeruj poprawną etykietę.
 PROVIDER_FORMAT = {
     "OPENAI_API_KEY": {
         "valid_prefixes": ("sk-proj-", "sk-svcacct-", "sk-"),
@@ -46,86 +46,86 @@ PROVIDER_FORMAT = {
             "sk-or-": ("OPENROUTER_API_KEY", "OpenRouter"),
             "sk-ant-": ("ANTHROPIC_API_KEY", "Anthropic"),
             "AIzaSy": ("GEMINI_API_KEY", "Google Gemini"),
-            "ya29.": ("GOOGLE_OAUTH_TOKEN", "Google OAuth (not an API key)"),
-            '{"': ("OAUTH_JSON_BLOB", "OAuth JSON blob (not an API key — rotate completely)"),
+            "ya29.": ("GOOGLE_OAUTH_TOKEN", "Google OAuth (to nie jest klucz API)"),
+            '{"': ("OAUTH_JSON_BLOB", "Obiekt JSON OAuth (to nie jest klucz API — wymień go całkowicie)"),
         },
-        "example": "sk-proj-XXXX (from https://platform.openai.com/api-keys)",
+        "example": "sk-proj-XXXX (z https://platform.openai.com/api-keys)",
     },
     "OPENROUTER_API_KEY": {
         "valid_prefixes": ("sk-or-",),
         "wrong_provider_hints": {
-            "sk-proj-": ("OPENAI_API_KEY", "OpenAI project key"),
+            "sk-proj-": ("OPENAI_API_KEY", "klucz projektu OpenAI"),
             "sk-ant-": ("ANTHROPIC_API_KEY", "Anthropic"),
             "AIzaSy": ("GEMINI_API_KEY", "Google Gemini"),
         },
-        "example": "sk-or-v1-XXXX (from https://openrouter.ai/keys)",
+        "example": "sk-or-v1-XXXX (z https://openrouter.ai/keys)",
     },
     "ANTHROPIC_API_KEY": {
         "valid_prefixes": ("sk-ant-",),
         "wrong_provider_hints": {
-            "sk-proj-": ("OPENAI_API_KEY", "OpenAI project key"),
+            "sk-proj-": ("OPENAI_API_KEY", "klucz projektu OpenAI"),
             "sk-or-": ("OPENROUTER_API_KEY", "OpenRouter"),
         },
-        "example": "sk-ant-XXXX (from https://console.anthropic.com/settings/keys)",
+        "example": "sk-ant-XXXX (z https://console.anthropic.com/settings/keys)",
     },
     "GEMINI_API_KEY": {
         "valid_prefixes": ("AIzaSy",),
         "wrong_provider_hints": {
-            "sk-proj-": ("OPENAI_API_KEY", "OpenAI project key"),
+            "sk-proj-": ("OPENAI_API_KEY", "klucz projektu OpenAI"),
             "sk-or-": ("OPENROUTER_API_KEY", "OpenRouter"),
             "sk-ant-": ("ANTHROPIC_API_KEY", "Anthropic"),
         },
-        "example": "AIzaSy... (from https://aistudio.google.com/apikey)",
+        "example": "AIzaSy... (z https://aistudio.google.com/apikey)",
     },
 }
 
 
 def validate_format(key_name: str, value: str) -> None:
-    """Check prefix matches expected provider format. Fail fast with a clear message."""
+    """Sprawdź, czy prefiks pasuje do oczekiwanego formatu dostawcy. Szybko zakończ z jasnym komunikatem."""
     spec = PROVIDER_FORMAT.get(key_name)
     if not spec:
-        return  # unknown provider -> no validation
+        return  # nieznany dostawca -> brak walidacji
 
     service = get_service()
 
-    # 1. Cross-provider mismatch (most common mistake — wrong provider key under this label)
+    # 1. Niezgodność dostawcy (najczęstszy błąd — klucz złego dostawcy pod tą etykietą)
     for wrong_prefix, (correct_label, provider_name) in spec["wrong_provider_hints"].items():
         if value.startswith(wrong_prefix):
             sys.exit(
-                f"ERROR: {key_name} in Keychain looks like a {provider_name} key (starts with '{wrong_prefix}').\n"
-                f"Most likely {correct_label} was stored under the {key_name} label by mistake.\n"
-                f"Fix:\n"
-                f"  1) Get the real {key_name}: {spec['example']}\n"
-                f"  2) Overwrite the wrong entry:\n"
+                f"BŁĄD: {key_name} w Keychain wygląda jak klucz {provider_name} (zaczyna się od '{wrong_prefix}').\n"
+                f"Najprawdopodobniej {correct_label} został omyłkowo zapisany pod etykietą {key_name}.\n"
+                f"Naprawa:\n"
+                f"  1) Pobierz prawdziwy {key_name}: {spec['example']}\n"
+                f"  2) Nadpisz błędny wpis:\n"
                 f"     security add-generic-password -U -a {key_name} -s {service} -w '<your-key>'\n"
-                f"  3) Verify: python3 scripts/get_secret.py {key_name} | head -c 12\n"
-                f"See docs/troubleshooting.md for more."
+                f"  3) Zweryfikuj: python3 scripts/get_secret.py {key_name} | head -c 12\n"
+                f"Zobacz docs/troubleshooting.md, aby dowiedzieć się więcej."
             )
 
-    # 2. Unknown format (doesn't match any expected prefix)
+    # 2. Nieznany format (nie pasuje do żadnego oczekiwanego prefiksu)
     if not any(value.startswith(p) for p in spec["valid_prefixes"]):
         prefix_preview = value[:8] if len(value) >= 8 else value
         sys.exit(
-            f"ERROR: {key_name} has an unknown format (starts with '{prefix_preview}...').\n"
-            f"Expected format: {spec['example']}\n"
-            f"Accepted prefixes: {', '.join(spec['valid_prefixes'])}\n"
-            f"See docs/troubleshooting.md."
+            f"BŁĄD: {key_name} ma nieznany format (zaczyna się od '{prefix_preview}...').\n"
+            f"Oczekiwany format: {spec['example']}\n"
+            f"Akceptowane prefiksy: {', '.join(spec['valid_prefixes'])}\n"
+            f"Zobacz docs/troubleshooting.md."
         )
 
 
 def get_from_keychain(key_name: str) -> str | None:
-    """Read from Keychain.
+    """Odczytaj z pęku kluczy (Keychain).
 
-    Lookup chain (in order):
-    1. security CLI: service=$KEYCHAIN_SERVICE, account=key_name
-    2. Python keyring fallback: service=$KEYCHAIN_SERVICE
-       (security CLI with -w returns an empty string for blob-format entries
-        created by `keyring.set_password()`; keyring can read those.)
+    Łańcuch wyszukiwania (w kolejności):
+    1. CLI security: service=$KEYCHAIN_SERVICE, account=key_name
+    2. Fallback do pythonowego keyring: service=$KEYCHAIN_SERVICE
+       (CLI security z flagą -w zwraca pusty ciąg dla wpisów w formacie blob
+        utworzonych przez `keyring.set_password()`; keyring potrafi je odczytać.)
     """
     import subprocess
     service = get_service()
 
-    # 1. security CLI (account=KEY_NAME convention — clean, scriptable)
+    # 1. CLI security (konwencja account=KEY_NAME — czyste, łatwe do skryptowania)
     try:
         r = subprocess.run(
             ["security", "find-generic-password", "-a", key_name, "-s", service, "-w"],
@@ -136,7 +136,7 @@ def get_from_keychain(key_name: str) -> str | None:
     except Exception:
         pass
 
-    # 2. Python keyring fallback (blob format — entries added via keyring.set_password())
+    # 2. Fallback do pythonowego keyring (format blob — wpisy dodane przez keyring.set_password())
     try:
         import keyring
         v = keyring.get_password(service, key_name)
@@ -168,21 +168,21 @@ def get_from_env_file(key_name: str) -> str | None:
 
 
 def get_secret(key_name: str, validate: bool = True) -> str:
-    # 1. Keychain
+    # 1. Pęk kluczy (Keychain)
     value = get_from_keychain(key_name)
     if value:
         if validate:
             validate_format(key_name, value)
         return value
 
-    # 2. Environment variable
+    # 2. Zmienna środowiskowa
     value = os.environ.get(key_name)
     if value and value != "STORED_IN_KEYRING":
         if validate:
             validate_format(key_name, value)
         return value
 
-    # 3. .env file (backward compat)
+    # 3. Plik .env (kompatybilność wsteczna)
     value = get_from_env_file(key_name)
     if value:
         if validate:
@@ -191,11 +191,11 @@ def get_secret(key_name: str, validate: bool = True) -> str:
 
     service = get_service()
     print(
-        f"ERROR: Secret '{key_name}' not found.\n"
-        f"Searched: Keychain (service='{service}'), env var, .env file.\n"
-        f"Add it with:\n"
+        f"BŁĄD: Nie znaleziono sekretu '{key_name}'.\n"
+        f"Przeszukano: Keychain (service='{service}'), zmienną środowiskową, plik .env.\n"
+        f"Dodaj go za pomocą:\n"
         f"  security add-generic-password -U -a {key_name} -s {service} -w '<your-key>'\n"
-        f"Or interactively (recommended — key never lands in shell history):\n"
+        f"Lub interaktywnie (zalecane — klucz nigdy nie trafia do historii powłoki):\n"
         f"  python3 -c \"import keyring; keyring.set_password('{service}', '{key_name}', input('Key: '))\"",
         file=sys.stderr,
     )
@@ -210,7 +210,7 @@ if __name__ == "__main__":
         args = [a for a in args if a != "--no-validate"]
 
     if len(args) != 1:
-        print("Usage: python3 get_secret.py KEY_NAME [--no-validate]", file=sys.stderr)
+        print("Użycie: python3 get_secret.py KEY_NAME [--no-validate]", file=sys.stderr)
         sys.exit(1)
 
     secret = get_secret(args[0], validate=validate)

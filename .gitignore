@@ -1,4 +1,4 @@
-# Secrets — never commit
+# Sekrety — nigdy nie commituj
 .env
 .env.local
 .env.*.local
@@ -18,7 +18,7 @@ venv/
 # macOS
 .DS_Store
 
-# Editors
+# Edytory
 .vscode/
 .idea/
 *.swp

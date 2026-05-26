@@ -1,6 +1,6 @@
-# MCP Wrapper Pattern — Keys for MCP Servers Without Plaintext
+# Wzorzec MCP Wrapper — Klucze dla serwerów MCP bez plaintextu
 
-If you use Claude Code (or any MCP host) with custom MCP servers, you've probably hit this:
+Jeśli używasz Claude Code (lub dowolnego hosta MCP) z własnymi serwerami MCP, prawdopodobnie spotkałeś się z tym problemem:
 
 ```json
 // .mcp.json
@@ -10,22 +10,22 @@ If you use Claude Code (or any MCP host) with custom MCP servers, you've probabl
       "command": "npx",
       "args": ["-y", "n8n-mcp"],
       "env": {
-        "N8N_API_KEY": "sk-XXX-PLAINTEXT-IN-COMMITTED-FILE"  // ← bad
+        "N8N_API_KEY": "sk-XXX-PLAINTEXT-IN-COMMITTED-FILE"  // ← źle
       }
     }
   }
 }
 ```
 
-That `env` field is the canonical way to pass secrets to an MCP server, but it lands in `.mcp.json`. Many projects commit `.mcp.json` (it tells teammates which MCP servers to use). And now your API key is in git history.
+Pole `env` to kanoniczny sposób przekazywania sekretów do serwera MCP, ale ląduje ono w `.mcp.json`. Wiele projektów commituje plik `.mcp.json` (informuje on zespół, jakich serwerów MCP używać). I w ten sposób Twój klucz API trafia do historii git.
 
-## The wrapper pattern
+## Wzorzec wrappera
 
-Instead of `command + env`, use a tiny shell wrapper that:
+Zamiast `command + env`, użyj małego wrappera w shellu, który:
 
-1. Reads the key from Keychain via `get_secret.py`
-2. Exports it as an env var
-3. `exec`'s the actual MCP server
+1. Odczytuje klucz z Keychain za pomocą `get_secret.py`
+2. Eksportuje go jako zmienną środowiskową
+3. Uruchamia właściwy serwer MCP za pomocą `exec`
 
 ```bash
 #!/bin/bash
@@ -38,7 +38,7 @@ export N8N_API_KEY
 exec npx -y n8n-mcp "$@"
 ```
 
-Wire into `.mcp.json` as `command`:
+Podepnij to w `.mcp.json` jako `command`:
 
 ```json
 {
@@ -50,24 +50,24 @@ Wire into `.mcp.json` as `command`:
 }
 ```
 
-Now `.mcp.json` is safe to commit — it has a path, not a secret.
+Teraz plik `.mcp.json` można bezpiecznie commitować — zawiera ścieżkę, a nie sekret.
 
-## Template + example included
+## Szablon + przykład w zestawie
 
-This repo ships:
+To repozytorium zawiera:
 
-- `scripts/mcp-wrapper-template.sh` — generic template with placeholders. Copy, rename, fill in `KEY_NAME` and `MCP_PACKAGE`.
-- `examples/mcp-n8n-wrapper.sh` — real-world wrapper for `n8n-mcp` (sanitized).
+- `scripts/mcp-wrapper-template.sh` — generyczny szablon z placeholderami. Skopiuj, zmień nazwę, wypełnij `KEY_NAME` i `MCP_PACKAGE`.
+- `examples/mcp-n8n-wrapper.sh` — rzeczywisty wrapper dla `n8n-mcp` (zanonimizowany).
 
 ```bash
 cp scripts/mcp-wrapper-template.sh scripts/mcp-stripe-wrapper.sh
-# edit KEY_NAME and MCP_PACKAGE, then:
+# edytuj KEY_NAME i MCP_PACKAGE, a następnie:
 chmod +x scripts/mcp-stripe-wrapper.sh
 ```
 
-## Multiple env vars (e.g. KEY + URL)
+## Wiele zmiennych środowiskowych (np. KEY + URL)
 
-If the MCP server needs more than one env var (API URL, region, etc.), add them in the wrapper before `exec`:
+Jeśli serwer MCP potrzebuje więcej niż jednej zmiennej środowiskowej (API URL, region itp.), dodaj je we wrapperze przed `exec`:
 
 ```bash
 #!/bin/bash
@@ -81,11 +81,11 @@ export STRIPE_API_VERSION="2024-06-20"
 exec npx -y stripe-mcp "$@"
 ```
 
-API URLs and config strings are fine to keep in the wrapper itself — they're not secrets.
+Adresy API URL i ciągi konfiguracyjne można bez problemu trzymać w samym wrapperze — nie są to sekrety.
 
-## Limitation: SSE-type MCP servers
+## Ograniczenie: Serwery MCP typu SSE
 
-The wrapper pattern works for `type: "command"` (stdio-based) MCP servers. It does **not** work for `type: "sse"` (server-sent events):
+Wzorzec wrappera działa dla serwerów MCP `type: "command"` (opartych na stdio). **Nie** działa dla `type: "sse"` (server-sent events):
 
 ```json
 {
@@ -94,38 +94,38 @@ The wrapper pattern works for `type: "command"` (stdio-based) MCP servers. It do
       "type": "sse",
       "url": "https://api.example.com/mcp",
       "headers": {
-        "Authorization": "Bearer sk-XXX"  // ← no wrapper can resolve this
+        "Authorization": "Bearer sk-XXX"  // ← żaden wrapper tego nie rozwiąże
       }
     }
   }
 }
 ```
 
-Claude Code loads the URL and headers directly — there's no process to wrap. Your options:
+Claude Code ładuje URL i nagłówki bezpośrednio — nie ma procesu, który można by owrapować. Twoje opcje to:
 
-1. **Accept plaintext in `.mcp.json`** with `.mcp.json` in `.gitignore`. Project-local only. Risky if you forget to gitignore.
-2. **Run a local proxy** that injects the header from Keychain. The MCP host sees `Authorization: Bearer none` go to `http://localhost:PORT/proxy`, proxy replaces with real key, forwards to remote.
+1. **Zaakceptowanie plaintextu w `.mcp.json`** z dodaniem `.mcp.json` do `.gitignore`. Tylko lokalnie dla projektu. Ryzykowne, jeśli zapomnisz dodać do gitignore.
+2. **Uruchomienie lokalnego proxy**, które wstrzykuje nagłówek z Keychain. Host MCP wysyła `Authorization: Bearer none` do `http://localhost:PORT/proxy`, proxy podmienia go na prawdziwy klucz i przekazuje do zdalnego serwera.
 
-For most use cases, option 1 is fine if `.mcp.json` is gitignored. Option 2 is overkill unless the team commits `.mcp.json` and uses SSE servers heavily.
+W większości przypadków opcja 1 jest w porządku, jeśli `.mcp.json` jest w gitignore. Opcja 2 to overkill, chyba że zespół commituje `.mcp.json` i intensywnie korzysta z serwerów SSE.
 
-## Why `exec` instead of just running?
+## Dlaczego `exec` zamiast po prostu uruchomić?
 
 ```bash
-# Bad — leaves shell process running, child is orphaned on signals
+# Źle — proces shella zostaje, proces potomny osierocony przy sygnałach
 npx -y n8n-mcp "$@"
 
-# Good — replaces shell process, signals (SIGTERM from MCP host) reach the MCP server cleanly
+# Dobrze — zastępuje proces shella, sygnały (SIGTERM z hosta MCP) czysto docierają do serwera MCP
 exec npx -y n8n-mcp "$@"
 ```
 
-`exec` is the difference between "MCP host kills the wrapper but the server keeps running" and "MCP host kills the server like it should."
+`exec` to różnica między "host MCP zabija wrappera, ale serwer nadal działa" a "host MCP zabija serwer tak, jak powinien".
 
-## Why `chmod 755` matters
+## Dlaczego `chmod 755` ma znaczenie
 
-Without execute permission, the MCP host gets `permission denied` and the server silently fails to start (sometimes with cryptic logs). Always:
+Bez uprawnień do wykonywania, host MCP otrzymuje `permission denied` i serwer po cichu nie uruchamia się (czasami z zagadkowymi logami). Zawsze rób:
 
 ```bash
 chmod 755 scripts/mcp-*-wrapper.sh
 ```
 
-The wrapper file itself is safe to commit (`chmod 755` is fine) — there's no secret in it, only a reference to `get_secret.py`.
+Sam plik wrappera można bezpiecznie commitować (`chmod 755` jest w porządku) — nie ma w nim żadnego sekretu, tylko odwołanie do `get_secret.py`.

@@ -1,84 +1,84 @@
-# Security First — Where Keys Must Never Go
+# Security First — Gdzie klucze nigdy nie mogą trafić
 
-Read this **before** you copy any key anywhere. This is the most important page in this toolkit.
+Przeczytaj to, **zanim** skopiujesz gdziekolwiek jakikolwiek klucz. To najważniejsza strona w tym zestawie narzędzi.
 
-## The one rule
+## Jedyna zasada
 
-> **Keys live in macOS Keychain. They never enter anything else.**
+> **Klucze żyją w macOS Keychain. Nigdy nie trafiają nigdzie indziej.**
 
-Anything else means: AI chats, commit messages, shell history, screenshots, screencasts, Slack DMs, sticky notes on your monitor, plain `.env` files committed to git. All of it is a leak vector.
+Nigdzie indziej oznacza: czaty AI, wiadomości commitów, historię shella, zrzuty ekranu, screencasty, wiadomości prywatne na Slacku, karteczki na Twoim monitorze, zwykłe pliki `.env` zacommitowane do gita. Wszystko to stanowi wektor wycieku.
 
-## Never paste keys into AI chats
+## Nigdy nie wklejaj kluczy do czatów AI
 
-Claude Code, ChatGPT, Cursor, Gemini, Copilot Chat, anything else — **never paste API keys into any of them.**
+Claude Code, ChatGPT, Cursor, Gemini, Copilot Chat i wszystkie inne — **nigdy nie wklejaj do nich kluczy API.**
 
-When you paste a key into an AI tool:
+Kiedy wklejasz klucz do narzędzia AI:
 
-- It enters the **session context** the model sees. The model technically "knows" it for the rest of that session.
-- It is processed through the **provider's pipeline** (Anthropic, OpenAI, etc.). Reputable providers state they don't train on this data, but the data is still seen by their inference systems and stored in logs for the retention window stated in their terms.
-- It lives in your **conversation transcript**. If you ever export, share, or screenshot that conversation — the key leaks.
-- A future bug in the AI tool (eval logging, support escalation, debug snapshot) could surface that transcript to humans on the provider's side.
+- Trafia on do **kontekstu sesji**, który widzi model. Model technicznie "zna" go przez resztę tej sesji.
+- Jest przetwarzany przez **potok dostawcy** (Anthropic, OpenAI, itp.). Renomowani dostawcy deklarują, że nie trenują na tych danych, ale dane te są nadal widoczne dla ich systemów inferencyjnych i przechowywane w logach przez okres retencji określony w ich regulaminach.
+- Zostaje w **transkrypcie Twojej konwersacji**. Jeśli kiedykolwiek wyeksportujesz, udostępnisz lub zrobisz zrzut ekranu tej rozmowy — klucz wycieknie.
+- Przyszły błąd w narzędziu AI (logowanie ewaluacji, eskalacja wsparcia, snapshot debugowania) może ujawnić ten transkrypt ludziom po stronie dostawcy.
 
-If you ever paste a key by accident — **rotate it immediately** (revoke in the provider's UI, generate a new one). Don't try to delete the chat history and hope. Assume compromise.
+Jeśli kiedykolwiek przypadkowo wkleisz klucz — **natychmiast go zrotuj** (unieważnij w UI dostawcy, wygeneruj nowy). Nie próbuj usuwać historii czatu i liczyć na cud. Zakładaj, że klucz został skompromitowany.
 
-## Never put keys in commit messages or commands
+## Nigdy nie umieszczaj kluczy w wiadomościach commitów ani poleceniach
 
 ```bash
-# WRONG — leaks to git history forever:
+# ŹLE — wycieka do historii gita na zawsze:
 git commit -m "fix auth; using OPENAI_API_KEY=sk-proj-abc123..."
 
-# WRONG — leaks to ~/.zsh_history:
+# ŹLE — wycieka do ~/.zsh_history:
 OPENAI_API_KEY=sk-proj-abc123... node app.js
 ```
 
-Both of these are recoverable. `git log --all -p` finds the first one even after force-push (the orphan commits stay reachable via reflog and packfiles). `~/.zsh_history` is plaintext.
+Oba te przypadki są do odzyskania. `git log --all -p` znajdzie ten pierwszy nawet po force-pushu (osierocone commity pozostają osiągalne przez reflog i packfiles). `~/.zsh_history` to zwykły tekst (plaintext).
 
-## Adding keys safely — three ways
+## Bezpieczne dodawanie kluczy — trzy sposoby
 
-Pick the most secure one your situation allows.
+Wybierz najbezpieczniejszy, na jaki pozwala Twoja sytuacja.
 
-### 1. Interactive Python (preferred — no shell history)
+### 1. Interaktywny Python (zalecane — brak historii shella)
 
 ```bash
 python3 -c "import keyring; keyring.set_password('my-secrets', 'OPENAI_API_KEY', input('Key: '))"
 ```
 
-You type the key at the prompt. It never enters `~/.zsh_history`, never enters a file, goes straight from your fingers to the Keychain.
+Wpisujesz klucz w prompcie. Nigdy nie trafia on do `~/.zsh_history`, nigdy nie trafia do pliku, idzie prosto z Twoich palców do Keychain.
 
-### 2. Native macOS `security` CLI
+### 2. Natywne CLI `security` w macOS
 
 ```bash
 security add-generic-password -U -a OPENAI_API_KEY -s my-secrets -w 'sk-proj-XXX'
 ```
 
-The key **is** in your shell history with this one — `~/.zsh_history` will record the whole command. If you must use this, prefix the command with a leading space (zsh's `HIST_IGNORE_SPACE` if you have it set) or clear history afterward:
+W tym przypadku klucz **znajduje się** w historii Twojego shella — `~/.zsh_history` zapisze całe polecenie. Jeśli musisz tego użyć, poprzedź polecenie spacją (jeśli masz ustawione `HIST_IGNORE_SPACE` w zsh) lub wyczyść historię po wszystkim:
 
 ```bash
 history -d $(history | tail -1 | awk '{print $1}')
 ```
 
-### 3. Bulk migration from `.env`
+### 3. Masowa migracja z `.env`
 
 ```bash
 python3 scripts/setup_keyring.py
 ```
 
-Reads your existing `.env`, moves values to Keychain, overwrites `.env` with `STORED_IN_KEYRING` placeholders. Use this **once** when migrating from an unsafe setup. Don't keep going back to `.env` after.
+Odczytuje Twój istniejący `.env`, przenosi wartości do Keychain, nadpisuje `.env` placeholderami `STORED_IN_KEYRING`. Użyj tego **raz** podczas migracji z niebezpiecznej konfiguracji. Nie wracaj później do `.env`.
 
-## Never store keys in screenshots or screencasts
+## Nigdy nie przechowuj kluczy na zrzutach ekranu ani screencastach
 
-If you record your terminal:
+Jeśli nagrywasz swój terminal:
 
-- Clear scrollback first: `clear && printf '\e[3J'`
-- Don't run `env` or `printenv` while recording
-- Don't expand `$(...)` substitutions on-camera — the output stays in scroll buffer
+- Najpierw wyczyść scrollback: `clear && printf '\e[3J'`
+- Nie uruchamiaj `env` ani `printenv` podczas nagrywania
+- Nie rozwijaj podstawień `$(...)` przed kamerą — wynik zostaje w buforze przewijania
 
-A common leak: showing `.zshrc` or running history during a tutorial.
+Częsty wyciek: pokazywanie `.zshrc` lub historii poleceń podczas tutoriala.
 
-## Never commit `.env`
+## Nigdy nie commituj `.env`
 
 ```bash
-# .gitignore must contain:
+# .gitignore musi zawierać:
 .env
 .env.local
 .env.*.local
@@ -88,21 +88,21 @@ credentials.json
 .mcp.json
 ```
 
-Already in this repo's `.gitignore`. If you copy this toolkit into another project, **copy `.gitignore` too** or merge those lines into the existing one.
+Znajduje się to już w `.gitignore` tego repozytorium. Jeśli kopiujesz ten zestaw narzędzi do innego projektu, **skopiuj również `.gitignore`** lub scal te linie z już istniejącym plikiem.
 
-## If a key leaks anyway
+## Jeśli klucz i tak wycieknie
 
-1. **Rotate immediately.** Revoke in the provider's UI, generate a new key, add it to Keychain.
-2. **Don't try to rewrite git history.** Force-pushing over a leaked commit doesn't help — caches, forks, and the GitHub event log keep copies. The key is compromised; the only fix is rotation.
-3. **Check provider's audit log.** OpenAI, Anthropic, etc. all have usage dashboards. Look for activity from IPs that aren't yours.
+1. **Natychmiast go zrotuj.** Unieważnij w UI dostawcy, wygeneruj nowy klucz, dodaj go do Keychain.
+2. **Nie próbuj przepisywać historii gita.** Force-push nadpisujący commit z wyciekiem nie pomaga — cache, forki i log zdarzeń GitHub zachowują kopie. Klucz jest skompromitowany; jedynym rozwiązaniem jest rotacja.
+3. **Sprawdź logi audytowe dostawcy.** OpenAI, Anthropic itp. mają panele zużycia. Szukaj aktywności z adresów IP, które nie należą do Ciebie.
 
-## Why this matters more than you think
+## Dlaczego ma to większe znaczenie, niż myślisz
 
-The default leak vector for AI API keys in 2026 is not someone hacking your machine. It's:
+Domyślnym wektorem wycieku kluczy API do AI w 2026 roku nie jest ktoś włamujący się na Twoją maszynę. Jest nim:
 
-- A `.env` file you forgot was committed
-- A screenshot in a public Slack channel
-- A key pasted into ChatGPT for "debugging"
-- A `git log` shared during code review
+- Plik `.env`, o którym zapomniałeś, że został zacommitowany
+- Zrzut ekranu na publicznym kanale Slack
+- Klucz wklejony do ChatGPT w celu "debugowania"
+- `git log` udostępniony podczas code review
 
-This toolkit exists because **convenient is the enemy of safe**. Keychain isn't the fastest setup. It's the one that doesn't leak.
+Ten zestaw narzędzi istnieje, ponieważ **wygoda jest wrogiem bezpieczeństwa**. Keychain nie jest najszybszą konfiguracją. Jest tą, która nie przecieka.
