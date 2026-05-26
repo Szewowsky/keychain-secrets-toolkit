@@ -90,6 +90,8 @@ credentials.json
 
 Znajduje się to już w `.gitignore` tego repozytorium. Jeśli kopiujesz ten zestaw narzędzi do innego projektu, **skopiuj również `.gitignore`** lub scal te linie z już istniejącym plikiem.
 
+> Pełne wytłumaczenie patternu `.env.example` vs `.env` (kiedy potrzebujesz lokalnego `.env`, co oznacza `STORED_IN_KEYRING`, kiedy w ogóle pomijasz `.env`) — patrz README sekcja [Dlaczego dwa pliki](../README.md#dlaczego-dwa-pliki-envexample-vs-env).
+
 ## Jeśli klucz i tak wycieknie
 
 1. **Natychmiast go zrotuj.** Unieważnij w UI dostawcy, wygeneruj nowy klucz, dodaj go do Keychain.

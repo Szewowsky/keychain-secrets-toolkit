@@ -97,6 +97,67 @@ openai_key = get_secret("OPENAI_API_KEY")
 
 Więcej w `examples/usage-curl.sh` i `examples/usage-python.py`.
 
+## Dlaczego dwa pliki: `.env.example` vs `.env`?
+
+Klasyczny pattern devops, ale często niejasny dla osób nowych w temacie. Dwa pliki, dwie role:
+
+```
+.env.example   ← W REPO. Tylko placeholdery STORED_IN_KEYRING.
+                 Bezpieczny do commitowania. Każdy kto clone'uje widzi nazwy kluczy
+                 (ale NIE wartości — bo wartości tu nigdy nie ma).
+
+.env           ← LOKALNIE TYLKO. Jest w .gitignore — nigdy nie idzie do gita.
+                 Trafia tu prawdziwy klucz TYLKO przy migracji (Metoda C).
+                 Po migracji jest nadpisany placeholderami STORED_IN_KEYRING.
+```
+
+### Co oznacza `STORED_IN_KEYRING`?
+
+To jest **placeholder** (zaślepka), nie magia. Skrypt `get_secret.py` widzi że wartość = `STORED_IN_KEYRING` i wie: *"nie traktuj tego jako prawdziwego klucza, idź dalej po łańcuchu (Keychain → env var → koniec)"*.
+
+Format każdej linii w `.env.example` i `.env`:
+
+```bash
+NAZWA_KLUCZA=STORED_IN_KEYRING
+```
+
+Przykład jak `.env` wygląda **po migracji** do Keychain (Metoda C) lub w `.env.example` (zawsze):
+
+```bash
+OPENAI_API_KEY=STORED_IN_KEYRING
+ANTHROPIC_API_KEY=STORED_IN_KEYRING
+OPENROUTER_API_KEY=STORED_IN_KEYRING
+GEMINI_API_KEY=STORED_IN_KEYRING
+```
+
+Widać tylko **które klucze są zarządzane**, ale nie ich wartości. Plik jest bezpieczny lokalnie i nie wycieka nawet jeśli ktoś zobaczy zrzut ekranu Twojego terminala.
+
+### Kiedy w ogóle potrzebujesz lokalnego `.env`?
+
+Zależy od wybranej metody setupu. **W większości scenariuszy `.env` w ogóle Ci nie jest potrzebny:**
+
+| Metoda | Tworzysz `.env`? | Dlaczego |
+|--------|-----------------|----------|
+| **A — interactive** (zalecana) | NIE | `setup_keyring.py --interactive` czyta klucze z prompta, idą prosto do Keychain. `.env` zbędny. |
+| **B — bezpośrednio CLI `security`** | NIE | `security add-generic-password ...` zapisuje prosto do Keychain. `.env` zbędny. |
+| **C — migracja z istniejącego `.env`** | TAK (tymczasowo) | `cp .env.example .env`, wpisujesz prawdziwe wartości, `setup_keyring.py` migruje do Keychain. Po migracji `.env` ma już tylko placeholdery. |
+
+Realistycznie: jeśli zaczynasz od zera, użyj Metody A i `.env` zostawia się jako artefakt teoretyczny. Metoda C ma sens tylko gdy już masz `.env` z kluczami z poprzedniego projektu/setupu i chcesz to zmigrować.
+
+### Co jeśli przypadkiem zacommituję `.env`?
+
+`.gitignore` ten plik wyklucza, więc `git add .` go nie złapie. ALE — możesz strzelić sobie w stopę jeśli:
+
+- Wymusisz `git add -f .env` (force)
+- Zmodyfikujesz `.gitignore` żeby `.env` nie był ignorowany
+- Skopiujesz prawdziwe wartości do `.env.example` przez pomyłkę
+
+Jeśli to się stanie:
+
+1. **Natychmiast zrotuj wszystkie klucze które wyciekły** (revoke w panelu providera + wygeneruj nowy + dodaj do Keychain)
+2. **Nie próbuj usuwać commita force-pushem** — kopie zostają w cache GitHuba, forkach, reflogach. Klucz jest skompromitowany w momencie wycieku, nie naprawisz tego rewritem historii.
+3. Patrz [docs/security-first.md](docs/security-first.md) → sekcja "Jeśli klucz i tak wycieknie" — pełna procedura.
+
 ## Walidacja cross-provider (bug którego nikt nie łapie za pierwszym razem)
 
 Wyobraź sobie że przypadkiem trzymasz klucz OpenRouter pod etykietą `OPENAI_API_KEY`. Wysyłasz go do OpenAI. OpenAI zwraca `401 Unauthorized`. Spędzasz godzinę debugując swój kod.
