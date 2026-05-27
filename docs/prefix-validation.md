@@ -30,7 +30,7 @@ Kiedy wywołujesz `get_secret.py OPENAI_API_KEY`:
 
 ```bash
 # Przypadkowe zapisanie klucza OpenRouter pod etykietą OpenAI:
-security add-generic-password -U -a OPENAI_API_KEY -s my-secrets -w 'sk-or-v1-real-openrouter-key'
+security add-generic-password -U -a OPENAI_API_KEY -s my-secrets -w 'sk-or-v1-PRZYKLAD-NIE-PRAWDZIWY-KLUCZ'
 
 # Próba użycia:
 python3 scripts/get_secret.py OPENAI_API_KEY
